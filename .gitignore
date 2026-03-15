@@ -39,3 +39,6 @@ lerna-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Screenshots (root)
+/mermaid-*.png
