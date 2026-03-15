@@ -1,0 +1,10 @@
+{
+  "name": "beautiful-mermaid-viewer-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run api.ts",
+    "start": "bun run api.ts"
+  }
+}
