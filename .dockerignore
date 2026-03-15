@@ -1,0 +1,35 @@
+# Dependencies
+node_modules
+
+# Build output (rebuilt in container)
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE and editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+npm-debug.log*
+.npm
+.turbo
+
+# Test and coverage
+coverage
+.nyc_output
+*.test.*
+*.spec.*
+
+# Documentation (optional - remove if you want docs in image)
+*.md
+!README.md
