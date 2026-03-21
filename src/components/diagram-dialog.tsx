@@ -17,8 +17,11 @@ interface DiagramDialogProps {
   diagram: Diagram | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (name: string, code: string) => void;
+  /** Return a Promise so the dialog can stay open when save fails (e.g. duplicate name). */
+  onSave: (name: string, code: string) => void | Promise<void>;
   mode: "create" | "edit";
+  /** Shown when creating inside a folder (optional). */
+  createInFolderName?: string | null;
 }
 
 const DEFAULT_DIAGRAM = `graph TD
@@ -34,6 +37,7 @@ export function DiagramDialog({
   onClose,
   onSave,
   mode,
+  createInFolderName,
 }: DiagramDialogProps) {
   const [name, setName] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -50,21 +54,31 @@ export function DiagramDialog({
     }
   }, [isOpen, mode, diagram]);
 
-  const handleSave = () => {
-    if (name.trim() && code.trim()) {
-      onSave(name.trim(), code.trim());
+  const handleSave = async () => {
+    if (!name.trim() || !code.trim()) return;
+    try {
+      await Promise.resolve(onSave(name.trim(), code.trim()));
       onClose();
+    } catch {
+      // Keep dialog open on failure
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Create New Diagram" : "Edit Diagram"}</DialogTitle>
           <DialogDescription>
             {mode === "create"
-              ? "Enter a name and Mermaid diagram code to create a new diagram."
+              ? createInFolderName
+                ? `New diagram will be created in folder "${createInFolderName}". Enter a name and Mermaid code.`
+                : "Enter a name and Mermaid diagram code to create a new diagram."
               : "Update your diagram name and code."}
           </DialogDescription>
         </DialogHeader>

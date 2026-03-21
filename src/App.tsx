@@ -11,34 +11,61 @@ import { Pencil, Trash2, FileText } from "lucide-react";
 import { AppSidebar } from "./components/app-sidebar";
 import { DiagramPreview } from "./components/diagram-preview";
 import { DiagramDialog } from "./components/diagram-dialog";
+import { FolderDialog } from "./components/folder-dialog";
 import {
   useDiagrams,
   useCreateDiagram,
+  useCreateFolder,
   useUpdateDiagram,
   useDeleteDiagram,
 } from "./hooks/use-diagrams";
-import type { Diagram } from "./types";
-
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { data: diagrams = [], isLoading } = useDiagrams();
   const createMutation = useCreateDiagram();
+  const createFolderMutation = useCreateFolder();
   const updateMutation = useUpdateDiagram();
   const deleteMutation = useDeleteDiagram();
 
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [dialogMode, setDialogMode] = React.useState<"create" | "edit">("create");
+  const [createParentId, setCreateParentId] = React.useState<number | null>(null);
+  const [folderDialogOpen, setFolderDialogOpen] = React.useState(false);
+  const [folderDialogParentId, setFolderDialogParentId] = React.useState<number | null>(null);
 
   const selectedDiagram = React.useMemo(
-    () => diagrams.find((d) => d.id === selectedId) || null,
+    () =>
+      diagrams.find((d) => d.id === selectedId && d.kind === "diagram") ?? null,
     [diagrams, selectedId]
   );
 
+  const createInFolderName = React.useMemo(() => {
+    if (createParentId === null) return null;
+    return diagrams.find((d) => d.id === createParentId)?.name ?? null;
+  }, [diagrams, createParentId]);
+
   const handleCreate = () => {
+    setCreateParentId(null);
     setDialogMode("create");
     setIsDialogOpen(true);
+  };
+
+  const handleCreateDiagramInFolder = (parentId: number) => {
+    setCreateParentId(parentId);
+    setDialogMode("create");
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenNewFolder = () => {
+    setFolderDialogParentId(null);
+    setFolderDialogOpen(true);
+  };
+
+  const handleCreateFolderInFolder = (parentId: number) => {
+    setFolderDialogParentId(parentId);
+    setFolderDialogOpen(true);
   };
 
   const handleEdit = () => {
@@ -48,33 +75,63 @@ function AppContent() {
     }
   };
 
-  const handleSave = (name: string, code: string) => {
-    if (dialogMode === "create") {
-      createMutation.mutate(
-        { name, mermaid_code: code },
-        {
-          onSuccess: (newDiagram: Diagram) => {
-            setSelectedId(newDiagram.id);
-          },
-        }
-      );
-    } else if (dialogMode === "edit" && selectedId) {
-      updateMutation.mutate({ id: selectedId, input: { name, mermaid_code: code } });
+  const handleSave = async (name: string, code: string) => {
+    try {
+      if (dialogMode === "create") {
+        const created = await createMutation.mutateAsync({
+          name,
+          mermaid_code: code,
+          parent_id: createParentId ?? null,
+        });
+        setSelectedId(created.id);
+      } else if (dialogMode === "edit" && selectedId) {
+        await updateMutation.mutateAsync({
+          id: selectedId,
+          input: { name, mermaid_code: code },
+        });
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Save failed");
+      throw e;
     }
   };
 
   const handleRename = (id: number, name: string) => {
-    updateMutation.mutate({ id, input: { name } });
+    updateMutation.mutate(
+      { id, input: { name } },
+      {
+        onError: (e: Error) => alert(e.message),
+      }
+    );
   };
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id, {
       onSuccess: () => {
-        if (selectedId === id) {
+        const subtree = new Set<number>();
+        const walk = (root: number) => {
+          subtree.add(root);
+          for (const d of diagrams) {
+            if (d.parent_id === root) walk(d.id);
+          }
+        };
+        walk(id);
+        if (selectedId !== null && subtree.has(selectedId)) {
           setSelectedId(null);
         }
       },
+      onError: (e: Error) => alert(e.message),
     });
+  };
+
+  const handleSaveNewFolder = (name: string) => {
+    createFolderMutation.mutate(
+      { name, parent_id: folderDialogParentId },
+      {
+        onSuccess: () => setFolderDialogOpen(false),
+        onError: (e: Error) => alert(e.message),
+      }
+    );
   };
 
   return (
@@ -84,8 +141,11 @@ function AppContent() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onCreate={handleCreate}
+        onCreateFolder={handleOpenNewFolder}
         onRename={handleRename}
         onDelete={handleDelete}
+        onCreateDiagramInFolder={handleCreateDiagramInFolder}
+        onCreateFolderInFolder={handleCreateFolderInFolder}
       />
       <SidebarInset className="flex flex-col">
         {/* Header */}
@@ -144,13 +204,19 @@ function AppContent() {
         </main>
       </SidebarInset>
 
-      {/* Dialog */}
       <DiagramDialog
         diagram={selectedDiagram}
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onSave={handleSave}
         mode={dialogMode}
+        createInFolderName={createInFolderName}
+      />
+
+      <FolderDialog
+        isOpen={folderDialogOpen}
+        onClose={() => setFolderDialogOpen(false)}
+        onSave={handleSaveNewFolder}
       />
     </SidebarProvider>
   );

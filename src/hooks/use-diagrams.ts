@@ -3,10 +3,11 @@ import {
   fetchDiagrams,
   fetchDiagram,
   createDiagram,
+  createFolder,
   updateDiagram,
   deleteDiagram,
 } from "@/lib/api";
-import type { UpdateDiagramInput } from "@/types";
+import type { CreateFolderInput, UpdateDiagramInput } from "@/types";
 
 export function useDiagrams() {
   return useQuery({
@@ -27,6 +28,16 @@ export function useCreateDiagram() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createDiagram,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["diagrams"] });
+    },
+  });
+}
+
+export function useCreateFolder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateFolderInput) => createFolder(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["diagrams"] });
     },
