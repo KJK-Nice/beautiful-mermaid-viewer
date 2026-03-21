@@ -6,6 +6,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { DiagramTreeView } from "./diagram-tree-view";
@@ -38,7 +39,7 @@ export function AppSidebar({
   const tree = React.useMemo(() => buildDiagramTree(diagrams), [diagrams]);
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="offcanvas">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
@@ -83,6 +84,7 @@ export function AppSidebar({
           <span className="group-data-[collapsible=icon]:hidden">New folder</span>
         </Button>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
