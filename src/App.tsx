@@ -206,7 +206,13 @@ function AppContent() {
               </span>
             </header>
             <main className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden text-muted-foreground">
-              <FileText className="mb-4 h-16 w-16 opacity-20" />
+              <img
+                src="/logo.svg"
+                alt=""
+                width={80}
+                height={80}
+                className="mb-4 h-20 w-20 rounded-2xl shadow-sm"
+              />
               <p className="text-lg font-medium">No diagram selected</p>
               <p className="text-sm">Create a new diagram or select one from the sidebar</p>
               <Button className="mt-4" onClick={handleCreate}>
