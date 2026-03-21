@@ -44,7 +44,13 @@ export function DiagramPreview({ code, className }: DiagramPreviewProps) {
     }
 
     try {
-      const theme = isDarkMode ? THEMES["github-dark"] : THEMES["github-light"];
+      const baseTheme = isDarkMode ? THEMES["github-dark"] : THEMES["github-light"];
+      // Ensure table/class/ER borders are visible: use explicit border when theme lacks it.
+      // Derived --_node-stroke (fg 20% into bg) can be too faint on light themes.
+      const theme =
+        "border" in baseTheme && baseTheme.border
+          ? baseTheme
+          : { ...baseTheme, border: baseTheme.line ?? (isDarkMode ? "#3d444d" : "#d1d9e0") };
       const result = renderMermaidSVG(code, theme);
       setSvgHtml(result);
       setError(null);
