@@ -13,6 +13,14 @@ import { DiagramPreview } from "./components/diagram-preview";
 import { DiagramDialog } from "./components/diagram-dialog";
 import { FolderDialog } from "./components/folder-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useDiagrams,
   useCreateDiagram,
   useCreateFolder,
@@ -34,6 +42,7 @@ function AppContent() {
   const [createParentId, setCreateParentId] = React.useState<number | null>(null);
   const [folderDialogOpen, setFolderDialogOpen] = React.useState(false);
   const [folderDialogParentId, setFolderDialogParentId] = React.useState<number | null>(null);
+  const [deleteDiagramDialogOpen, setDeleteDiagramDialogOpen] = React.useState(false);
 
   const selectedDiagram = React.useMemo(
     () =>
@@ -134,6 +143,38 @@ function AppContent() {
     );
   };
 
+  const mergedLeading = (
+    <>
+      <SidebarTrigger className="-ml-1 shrink-0" />
+      <Separator orientation="vertical" className="h-4 shrink-0" />
+      {selectedDiagram ? (
+        <>
+          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate font-semibold">{selectedDiagram.name}</span>
+        </>
+      ) : null}
+    </>
+  );
+
+  const mergedTrailing =
+    selectedDiagram != null ? (
+      <>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 px-2" onClick={handleEdit}>
+          <Pencil className="h-4 w-4" />
+          <span className="hidden sm:inline">Edit</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 px-2 text-destructive hover:text-destructive"
+          onClick={() => setDeleteDiagramDialogOpen(true)}
+        >
+          <Trash2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Delete</span>
+        </Button>
+      </>
+    ) : null;
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -147,61 +188,33 @@ function AppContent() {
         onCreateDiagramInFolder={handleCreateDiagramInFolder}
         onCreateFolderInFolder={handleCreateFolderInFolder}
       />
-      <SidebarInset className="flex flex-col">
-        {/* Header */}
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex flex-1 items-center justify-between">
-            <div className="flex items-center gap-2">
-              {selectedDiagram ? (
-                <>
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-semibold">{selectedDiagram.name}</span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">
-                  {isLoading ? "Loading..." : "Select a diagram or create a new one"}
-                </span>
-              )}
-            </div>
-            {selectedDiagram && (
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={handleEdit}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(selectedDiagram.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </div>
-            )}
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-hidden">
-          {selectedDiagram ? (
-            <DiagramPreview code={selectedDiagram.mermaid_code} className="h-full" />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+      <SidebarInset className="flex min-h-0 flex-1 flex-col">
+        {selectedDiagram ? (
+          <DiagramPreview
+            className="min-h-0 flex-1"
+            code={selectedDiagram.mermaid_code}
+            leadingToolbar={mergedLeading}
+            trailingToolbar={mergedTrailing}
+          />
+        ) : (
+          <>
+            <header className="flex min-h-10 shrink-0 items-center gap-2 border-b bg-background px-3 py-1.5">
+              <SidebarTrigger className="-ml-1 shrink-0" />
+              <Separator orientation="vertical" className="h-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                {isLoading ? "Loading..." : "Select a diagram or create a new one"}
+              </span>
+            </header>
+            <main className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden text-muted-foreground">
               <FileText className="mb-4 h-16 w-16 opacity-20" />
               <p className="text-lg font-medium">No diagram selected</p>
-              <p className="text-sm">
-                Create a new diagram or select one from the sidebar
-              </p>
+              <p className="text-sm">Create a new diagram or select one from the sidebar</p>
               <Button className="mt-4" onClick={handleCreate}>
                 Create Diagram
               </Button>
-            </div>
-          )}
-        </main>
+            </main>
+          </>
+        )}
       </SidebarInset>
 
       <DiagramDialog
@@ -218,6 +231,46 @@ function AppContent() {
         onClose={() => setFolderDialogOpen(false)}
         onSave={handleSaveNewFolder}
       />
+
+      <Dialog
+        open={deleteDiagramDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDiagramDialogOpen(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete diagram</DialogTitle>
+            <DialogDescription>
+              {selectedDiagram ? (
+                <>
+                  Are you sure you want to delete &quot;{selectedDiagram.name}&quot;? This cannot be
+                  undone.
+                </>
+              ) : (
+                "This diagram is no longer selected."
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDiagramDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedDiagram) {
+                  handleDelete(selectedDiagram.id);
+                  setDeleteDiagramDialogOpen(false);
+                }
+              }}
+              disabled={!selectedDiagram}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }

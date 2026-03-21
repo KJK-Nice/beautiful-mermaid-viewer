@@ -2,14 +2,24 @@ import * as React from "react";
 import { renderMermaidSVG, THEMES } from "beautiful-mermaid";
 import { ZoomIn, ZoomOut, RotateCcw, Hand, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-interface DiagramPreviewProps {
+export interface DiagramPreviewProps {
   code: string;
   className?: string;
+  /** Left side of the merged toolbar (e.g. sidebar trigger + title). */
+  leadingToolbar?: React.ReactNode;
+  /** After viewer controls (e.g. Edit / Delete). */
+  trailingToolbar?: React.ReactNode;
 }
 
-export function DiagramPreview({ code, className }: DiagramPreviewProps) {
+export function DiagramPreview({
+  code,
+  className,
+  leadingToolbar,
+  trailingToolbar,
+}: DiagramPreviewProps) {
   const [svgHtml, setSvgHtml] = React.useState<string>("");
   const [error, setError] = React.useState<string | null>(null);
   const [scale, setScale] = React.useState(1);
@@ -18,7 +28,6 @@ export function DiagramPreview({ code, className }: DiagramPreviewProps) {
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
   const [isDarkMode, setIsDarkMode] = React.useState(false);
 
-  // Check dark mode on mount
   React.useEffect(() => {
     const checkDarkMode = () => {
       const isDark = document.documentElement.classList.contains("dark");
@@ -35,7 +44,6 @@ export function DiagramPreview({ code, className }: DiagramPreviewProps) {
     return () => observer.disconnect();
   }, []);
 
-  // Render diagram with appropriate theme
   React.useEffect(() => {
     if (!code.trim()) {
       setSvgHtml("");
@@ -45,8 +53,6 @@ export function DiagramPreview({ code, className }: DiagramPreviewProps) {
 
     try {
       const baseTheme = isDarkMode ? THEMES["github-dark"] : THEMES["github-light"];
-      // Ensure table/class/ER borders are visible: use explicit border when theme lacks it.
-      // Derived --_node-stroke (fg 20% into bg) can be too faint on light themes.
       const theme =
         "border" in baseTheme && baseTheme.border
           ? baseTheme
@@ -105,34 +111,51 @@ export function DiagramPreview({ code, className }: DiagramPreviewProps) {
   };
 
   return (
-    <div className={cn("relative flex flex-col h-full w-full bg-background", className)}>
-      <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
-        <div className="flex items-center gap-2">
-          <Hand className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Drag to pan, Ctrl+Scroll to zoom</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={toggleTheme}>
+    <div className={cn("relative flex min-h-0 flex-1 flex-col bg-background", className)}>
+      <div className="flex min-h-10 shrink-0 items-center gap-2 border-b bg-muted/50 px-3 py-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">{leadingToolbar}</div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-muted-foreground"
+                aria-label="Pan and zoom shortcuts"
+              >
+                <Hand className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Drag to pan, Ctrl+Scroll to zoom</TooltipContent>
+          </Tooltip>
+          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={toggleTheme}>
             {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="ghost" size="sm" onClick={handleZoomOut}>
+          <div className="mx-0.5 h-4 w-px shrink-0 bg-border" />
+          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleZoomOut}>
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-xs text-muted-foreground min-w-[60px] text-center">
+          <span className="min-w-[52px] shrink-0 text-center text-xs text-muted-foreground tabular-nums">
             {Math.round(scale * 100)}%
           </span>
-          <Button variant="ghost" size="sm" onClick={handleZoomIn}>
+          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleZoomIn}>
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleReset}>
+          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleReset}>
             <RotateCcw className="h-4 w-4" />
           </Button>
+          {trailingToolbar ? (
+            <>
+              <div className="mx-1 h-4 w-px shrink-0 bg-border" />
+              <div className="flex items-center gap-1">{trailingToolbar}</div>
+            </>
+          ) : null}
         </div>
       </div>
 
       <div
-        className="flex-1 overflow-hidden bg-muted/30 cursor-grab active:cursor-grabbing relative"
+        className="relative flex-1 cursor-grab overflow-hidden bg-muted/30 active:cursor-grabbing"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
