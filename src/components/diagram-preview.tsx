@@ -12,6 +12,8 @@ export interface DiagramPreviewProps {
   leadingToolbar?: React.ReactNode;
   /** After viewer controls (e.g. Edit / Delete). */
   trailingToolbar?: React.ReactNode;
+  /** Optional banner below the toolbar (e.g. shared-diagram notice). */
+  topBanner?: React.ReactNode;
 }
 
 export function DiagramPreview({
@@ -19,6 +21,7 @@ export function DiagramPreview({
   className,
   leadingToolbar,
   trailingToolbar,
+  topBanner,
 }: DiagramPreviewProps) {
   const [svgHtml, setSvgHtml] = React.useState<string>("");
   const [error, setError] = React.useState<string | null>(null);
@@ -153,6 +156,10 @@ export function DiagramPreview({
           ) : null}
         </div>
       </div>
+
+      {topBanner ? (
+        <div className="shrink-0 border-b bg-muted/40 px-3 py-2 text-sm">{topBanner}</div>
+      ) : null}
 
       <div
         className="relative flex-1 cursor-grab overflow-hidden bg-muted/30 active:cursor-grabbing"
