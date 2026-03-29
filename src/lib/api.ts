@@ -116,6 +116,24 @@ function wouldCreateCycle(
   return subtree.has(newParentId);
 }
 
+/** Whether moving `itemId` under `newParentId` is allowed (client-side DnD validation). */
+export function canReparentDiagram(
+  diagrams: Diagram[],
+  itemId: number,
+  newParentId: number | null
+): boolean {
+  const item = diagrams.find((d) => d.id === itemId);
+  if (!item) return false;
+  if (item.parent_id === newParentId) return false;
+  if (newParentId !== null) {
+    const p = findParent(diagrams, newParentId);
+    if (!p || p.kind !== "folder") return false;
+  }
+  if (wouldCreateCycle(diagrams, itemId, newParentId)) return false;
+  if (siblingNameTaken(diagrams, newParentId, item.name, itemId)) return false;
+  return true;
+}
+
 export async function fetchDiagrams(): Promise<Diagram[]> {
   const diagrams = getDiagrams();
   return [...diagrams].sort((a, b) => b.updated_at - a.updated_at);

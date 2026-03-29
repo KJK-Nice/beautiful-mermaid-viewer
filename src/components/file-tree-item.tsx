@@ -20,6 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Diagram } from "@/types";
 import { getAncestorPath } from "@/lib/diagram-tree";
+import { canReparentDiagram } from "@/lib/api";
+import {
+  diagramDragStart,
+  diagramDragEnd,
+  getDiagramDragSessionId,
+  getDroppedDiagramId,
+} from "@/lib/diagram-dnd";
 import { cn } from "@/lib/utils";
 
 interface FileTreeItemProps {
@@ -29,6 +36,8 @@ interface FileTreeItemProps {
   onSelect: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onMoveItem: (draggedId: number, newParentId: number | null) => void;
+  dragEnabled?: boolean;
   /** Indent step for file-tree alignment (px). */
   depth?: number;
 }
@@ -40,13 +49,61 @@ export function FileTreeItem({
   onSelect,
   onRename,
   onDelete,
+  onMoveItem,
+  dragEnabled = true,
   depth = 0,
 }: FileTreeItemProps) {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [newName, setNewName] = React.useState(diagram.name);
+  const [fileDropOver, setFileDropOver] = React.useState(false);
 
   const pathTooltip = getAncestorPath(allItems, diagram.id).join(" / ");
+  const dropParentId = diagram.parent_id;
+
+  const handleFileDragStart = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    diagramDragStart(diagram.id, e.dataTransfer);
+  };
+
+  const handleFileDragEnd = () => {
+    diagramDragEnd();
+    setFileDropOver(false);
+  };
+
+  const handleFileDragOver = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    const draggedId = getDiagramDragSessionId();
+    if (draggedId === null) return;
+    if (!canReparentDiagram(allItems, draggedId, dropParentId)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleFileDragEnter = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    const draggedId = getDiagramDragSessionId();
+    if (draggedId === null) return;
+    if (!canReparentDiagram(allItems, draggedId, dropParentId)) return;
+    e.preventDefault();
+    setFileDropOver(true);
+  };
+
+  const handleFileDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setFileDropOver(false);
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    e.preventDefault();
+    setFileDropOver(false);
+    diagramDragEnd();
+    const draggedId = getDroppedDiagramId(e.dataTransfer);
+    if (draggedId === null) return;
+    if (!canReparentDiagram(allItems, draggedId, dropParentId)) return;
+    onMoveItem(draggedId, dropParentId);
+  };
 
   const handleRename = () => {
     if (newName.trim() && newName !== diagram.name) {
@@ -70,8 +127,16 @@ export function FileTreeItem({
             <SidebarMenuButton
               isActive={isSelected}
               onClick={onSelect}
+              draggable={dragEnabled}
+              onDragStart={handleFileDragStart}
+              onDragEnd={handleFileDragEnd}
+              onDragOver={handleFileDragOver}
+              onDragEnter={handleFileDragEnter}
+              onDragLeave={handleFileDragLeave}
+              onDrop={handleFileDrop}
               className={cn(
-                "w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center"
+                "w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center",
+                fileDropOver && dragEnabled && "bg-muted/50 ring-2 ring-primary/30 ring-inset"
               )}
               style={{ paddingLeft: `${padLeft}px` }}
               tooltip={pathTooltip}

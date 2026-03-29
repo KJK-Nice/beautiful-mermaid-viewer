@@ -145,6 +145,17 @@ function AppContent() {
     );
   };
 
+  const handleMoveItem = async (draggedId: number, newParentId: number | null) => {
+    try {
+      await updateMutation.mutateAsync({
+        id: draggedId,
+        input: { parent_id: newParentId },
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Move failed");
+    }
+  };
+
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id, {
       onSuccess: () => {
@@ -281,6 +292,7 @@ function AppContent() {
         onCreateFolder={handleOpenNewFolder}
         onRename={handleRename}
         onDelete={handleDelete}
+        onMoveItem={handleMoveItem}
         onCreateDiagramInFolder={handleCreateDiagramInFolder}
         onCreateFolderInFolder={handleCreateFolderInFolder}
       />

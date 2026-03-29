@@ -35,6 +35,13 @@ import { Input } from "@/components/ui/input";
 import type { Diagram } from "@/types";
 import type { TreeNode } from "@/lib/diagram-tree";
 import { getAncestorPath } from "@/lib/diagram-tree";
+import { canReparentDiagram } from "@/lib/api";
+import {
+  diagramDragStart,
+  diagramDragEnd,
+  getDiagramDragSessionId,
+  getDroppedDiagramId,
+} from "@/lib/diagram-dnd";
 import { FileTreeItem } from "./file-tree-item";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +52,9 @@ export interface DiagramTreeViewProps {
   onSelectDiagram: (id: number) => void;
   onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void;
+  onMoveItem: (draggedId: number, newParentId: number | null) => void;
+  /** When false (e.g. icon-collapsed sidebar), dragging is disabled. */
+  dragEnabled?: boolean;
   onCreateDiagramInFolder: (parentId: number) => void;
   onCreateFolderInFolder: (parentId: number) => void;
   depth?: number;
@@ -57,6 +67,8 @@ export function DiagramTreeView({
   onSelectDiagram,
   onRename,
   onDelete,
+  onMoveItem,
+  dragEnabled = true,
   onCreateDiagramInFolder,
   onCreateFolderInFolder,
   depth = 0,
@@ -77,6 +89,8 @@ export function DiagramTreeView({
           onSelectDiagram={onSelectDiagram}
           onRename={onRename}
           onDelete={onDelete}
+          onMoveItem={onMoveItem}
+          dragEnabled={dragEnabled}
           onCreateDiagramInFolder={onCreateDiagramInFolder}
           onCreateFolderInFolder={onCreateFolderInFolder}
           depth={depth}
@@ -93,6 +107,8 @@ function TreeNodeRow({
   onSelectDiagram,
   onRename,
   onDelete,
+  onMoveItem,
+  dragEnabled = true,
   onCreateDiagramInFolder,
   onCreateFolderInFolder,
   depth = 0,
@@ -106,6 +122,8 @@ function TreeNodeRow({
         onSelect={() => onSelectDiagram(node.item.id)}
         onRename={(name) => onRename(node.item.id, name)}
         onDelete={() => onDelete(node.item.id)}
+        onMoveItem={onMoveItem}
+        dragEnabled={dragEnabled}
         depth={depth}
       />
     );
@@ -120,6 +138,8 @@ function TreeNodeRow({
       onSelectDiagram={onSelectDiagram}
       onRename={onRename}
       onDelete={onDelete}
+      onMoveItem={onMoveItem}
+      dragEnabled={dragEnabled}
       onCreateDiagramInFolder={onCreateDiagramInFolder}
       onCreateFolderInFolder={onCreateFolderInFolder}
       depth={depth}
@@ -135,6 +155,8 @@ interface FolderTreeRowProps {
   onSelectDiagram: (id: number) => void;
   onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void;
+  onMoveItem: (draggedId: number, newParentId: number | null) => void;
+  dragEnabled: boolean;
   onCreateDiagramInFolder: (parentId: number) => void;
   onCreateFolderInFolder: (parentId: number) => void;
   depth: number;
@@ -148,6 +170,8 @@ function FolderTreeRow({
   onSelectDiagram,
   onRename,
   onDelete,
+  onMoveItem,
+  dragEnabled,
   onCreateDiagramInFolder,
   onCreateFolderInFolder,
   depth,
@@ -156,9 +180,56 @@ function FolderTreeRow({
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [newName, setNewName] = React.useState(folder.name);
+  const [folderDropOver, setFolderDropOver] = React.useState(false);
 
   const pathTooltip = getAncestorPath(allItems, folder.id).join(" / ");
   const padLeft = 8 + depth * 12;
+
+  const folderDropNewParentId = folder.id;
+
+  const handleFolderDragStart = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    diagramDragStart(folder.id, e.dataTransfer);
+  };
+
+  const handleFolderDragEnd = () => {
+    diagramDragEnd();
+    setFolderDropOver(false);
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    const draggedId = getDiagramDragSessionId();
+    if (draggedId === null) return;
+    if (!canReparentDiagram(allItems, draggedId, folderDropNewParentId)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleFolderDragEnter = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    const draggedId = getDiagramDragSessionId();
+    if (draggedId === null) return;
+    if (!canReparentDiagram(allItems, draggedId, folderDropNewParentId)) return;
+    e.preventDefault();
+    setFolderDropOver(true);
+  };
+
+  const handleFolderDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setFolderDropOver(false);
+  };
+
+  const handleFolderDrop = (e: React.DragEvent) => {
+    if (!dragEnabled) return;
+    e.preventDefault();
+    setFolderDropOver(false);
+    diagramDragEnd();
+    const draggedId = getDroppedDiagramId(e.dataTransfer);
+    if (draggedId === null) return;
+    if (!canReparentDiagram(allItems, draggedId, folderDropNewParentId)) return;
+    onMoveItem(draggedId, folderDropNewParentId);
+  };
 
   const handleRename = () => {
     const trimmed = newName.trim();
@@ -177,7 +248,17 @@ function FolderTreeRow({
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton
                   type="button"
-                  className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center"
+                  draggable={dragEnabled}
+                  onDragStart={handleFolderDragStart}
+                  onDragEnd={handleFolderDragEnd}
+                  onDragOver={handleFolderDragOver}
+                  onDragEnter={handleFolderDragEnter}
+                  onDragLeave={handleFolderDragLeave}
+                  onDrop={handleFolderDrop}
+                  className={cn(
+                    "w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center",
+                    folderDropOver && dragEnabled && "bg-muted/50 ring-2 ring-primary/30 ring-inset"
+                  )}
                   style={{ paddingLeft: `${padLeft}px` }}
                   tooltip={pathTooltip}
                 >
@@ -235,6 +316,8 @@ function FolderTreeRow({
                 onSelectDiagram={onSelectDiagram}
                 onRename={onRename}
                 onDelete={onDelete}
+                onMoveItem={onMoveItem}
+                dragEnabled={dragEnabled}
                 onCreateDiagramInFolder={onCreateDiagramInFolder}
                 onCreateFolderInFolder={onCreateFolderInFolder}
                 depth={depth + 1}
